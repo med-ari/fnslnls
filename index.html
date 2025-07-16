@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Interactivo: Álgebra y Funciones</title>
+
+    <!-- 1. Include Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- 2. Include KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="renderMath()"></script>
+
+    <!-- 3. Include p5.js for graph rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
+    <!-- 4. Styling for the Quiz -->
+    <style>
+        :root {
+            --primary-color: #4f46e5; --primary-dark: #4338ca; --primary-light: #eef2ff;
+            --secondary-color: #64748b; --success-color: #10b981; --success-light: #ecfdf5;
+            --danger-color: #ef4444; --danger-light: #fef2f2; --warning-color: #f59e0b; 
+            --light-bg: #f1f5f9; --border-color: #cbd5e1; --text-color: #1e293b; 
+            --white: #ffffff; --progress-color-start: #4f46e5; --progress-color-end: #10b981;
+        }
+        @keyframes moveGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        body {
+            font-family: 'Inter', sans-serif; display: flex; justify-content: center;
+            align-items: center; min-height: 100vh;
+            background: linear-gradient(-45deg, #6d28d9, #4f46e5, #d946ef, #10b981);
+            background-size: 400% 400%; animation: moveGradient 20s ease infinite;
+            margin: 0; padding: 2em 1em;
+        }
+        #quiz-wrapper { width: 100%; max-width: 900px; position: relative; }
+        #quiz-container, .summary-card { background: var(--white); padding: 2.5em; border-radius: 16px; box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15); animation: fadeIn 0.5s ease-out; }
+        
+        /* Summary Card Styles */
+        #summary-container { display: none; gap: 2em; align-items: flex-start; animation: fadeIn 0.5s ease-out; }
+        #summary-text-card { flex: 1; }
+        #summary-visuals-card { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        #summary-container.interactive-view, #summary-container.text-only-view { flex-direction: column; }
+        #summary-container.interactive-view #summary-visuals-card, #summary-container.text-only-view #summary-text-card { width: 100%; margin-top: 0; flex: none; }
+        #summary-container.interactive-view #summary-visuals-card { margin-top: 2em; }
+        #summary-text-card h2 { font-size: 1.8em; margin-top: 0; margin-bottom: 0.5em; color: var(--primary-color); }
+        #summary-text-card .subtitle { color: var(--secondary-color); margin-top: 0; margin-bottom: 1.5em; }
+        #summary-text-card ul { list-style: disc; padding-left: 20px; margin: 0; }
+        #summary-text-card li { margin-bottom: 1.2em; line-height: 1.6; padding-left: 8px; }
+
+        #summary-visuals-card h3 { margin-top: 0; color: var(--text-color); text-align: center; }
+        .summary-graphs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5em; }
+        .summary-graphs svg { border: 1px solid var(--border-color); border-radius: 8px; width: 100%; height: auto; }
+        #interactive-graph-container .p5-canvas-container { border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1em; height: 350px !important; }
+        #interactive-graph-container .sliders { display: flex; justify-content: space-around; gap: 1em; margin-top: 1em; }
+        #interactive-graph-container label { font-weight: 500; }
+        #interactive-graph-equation { font-size: 1.2em; font-weight: 700; color: var(--primary-color); margin-top: 1em; min-height: 1.5em; text-align: center; }
+        
+        #summary-continue-btn { padding: 12px 30px; font-size: 1em; font-weight: bold; color: var(--white); background-color: var(--primary-color); border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-top: 2em; display: block; width: 100%; }
+        #summary-continue-btn:hover { background-color: var(--primary-dark); transform: scale(1.02); }
+
+        /* Main Quiz Styles */
+        #quiz-header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5em; }
+        #problem-header { color: var(--text-color); font-weight: 600; font-size: 1.1em; }
+        #score-counter { color: var(--success-color); font-weight: 600; font-size: 1em; background-color: var(--success-light); padding: 5px 10px; border-radius: 8px; }
+        #timer-container { width: 50px; height: 50px; position: relative; }
+        #progress-container { width: 100%; background-color: #e2e8f0; border-radius: 10px; margin-bottom: 1.5em; height: 12px; overflow: hidden; }
+        #progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--progress-color-start), var(--progress-color-end)); border-radius: 10px; transition: width 0.6s cubic-bezier(0.4, 0.0, 0.2, 1); }
+        #question-container { font-size: 1.15em; line-height: 1.7; margin: 1em 0; color: var(--text-color); text-align: justify; }
+        #question-container table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+        #question-container th, #question-container td { border: 1px solid var(--border-color); padding: 12px; text-align: center; }
+        #question-container th { background-color: var(--light-bg); font-weight: 600; }
+        #graph-container, .option-graph-canvas-container { width: 100%; max-width: 450px; aspect-ratio: 1 / 1; margin: 1.5em auto; border-radius: 8px; overflow: hidden; }
+        #options-container { margin-top: 1.5em; display: flex; flex-direction: column; gap: 0.75em; }
+        .option-button { display: flex; align-items: center; gap: 1em; width: 100%; padding: 14px 18px; font-size: 1.05em; text-align: left; background-color: var(--white); border: 2px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s ease-in-out; }
+        .option-button:hover:not(.disabled) { border-color: var(--primary-color); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .option-button .label { font-weight: bold; color: var(--primary-color); }
+        .option-button.correct { border-color: var(--success-color); background-color: var(--success-light); }
+        .option-button.correct .label { color: var(--success-color); }
+        .option-button.incorrect { border-color: var(--danger-color); background-color: var(--danger-light); }
+        .option-button.incorrect .label { color: var(--danger-color); }
+        .option-button.disabled { cursor: not-allowed; }
+        .options-grid-with-graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
+        .option-block-graph { padding: 1em; border: 2px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s ease-in-out; background-color: var(--white); }
+        .option-block-graph:hover:not(.disabled) { border-color: var(--primary-color); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .option-block-graph.correct { border-color: var(--success-color)!important; background-color: var(--success-light); }
+        .option-block-graph.incorrect { border-color: var(--danger-color)!important; background-color: var(--danger-light); }
+        .option-block-graph .label { font-size: 1.2em; font-weight: bold; margin-bottom: 0.5em; color: var(--primary-color); }
+        
+        #feedback-container { margin-top: 1.5em; padding: 1.2em; border-radius: 12px; display: none; animation: slideDownFade 0.4s ease-out; line-height: 1.7; text-align: justify; }
+        #feedback-container.correct { background-color: var(--success-light); border-left: 5px solid var(--success-color); }
+        #feedback-container.incorrect { background-color: var(--danger-light); border-left: 5px solid var(--danger-color); }
+        #feedback-title { display: flex; align-items: center; font-size: 1.2em; font-weight: 700; margin-bottom: 0.5em; }
+        #feedback-title svg { width: 24px; height: 24px; margin-right: 8px; }
+        #feedback-container.correct #feedback-title { color: var(--success-color); }
+        #feedback-container.incorrect #feedback-title { color: var(--danger-color); }
+
+        #navigation-container { display: flex; justify-content: flex-end; margin-top: 2em; }
+        #next-button, #repeat-btn { padding: 12px 30px; font-size: 1em; font-weight: bold; color: var(--white); background-color: var(--primary-color); border: none; border-radius: 10px; cursor: pointer; transition: all 0.3s; }
+        #next-button { visibility: hidden; opacity: 0; }
+        #next-button.visible { visibility: visible; opacity: 1; }
+        #next-button:hover, #repeat-btn:hover { background-color: var(--primary-dark); }
+        #final-screen { text-align: center; animation: fadeIn 0.5s ease-out; }
+        #final-screen h2 { font-size: 2.2em; color: var(--primary-color); font-weight: 700; }
+        #final-screen p { font-size: 1.2em; }
+        #timer-ring-bg, #timer-ring-fg { fill: none; stroke-width: 4; }
+        #timer-ring-bg { stroke: #e2e8f0; }
+        #timer-ring-fg { stroke: var(--primary-color); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 1s linear, stroke 0.5s ease; }
+        #timer-ring-fg.warning { stroke: var(--warning-color); }
+        #timer-ring-fg.ending { stroke: var(--danger-color); }
+        #timer-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-size: 14px; font-weight: 700; color: var(--secondary-color); }
+        .highlight { color: var(--primary-color); font-weight: 700; }
+        .hidden { display: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDownFade { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (min-width: 950px) { #summary-container { display: flex; } #summary-container.interactive-view { flex-direction: column; } #summary-container.interactive-view #summary-visuals-card { width: 100%; margin-top: 2em; }}
+        @media (max-width: 949px) { #summary-container { display: flex; flex-direction: column; } #summary-visuals-card { margin-top: 2em; } }
+    </style>
+</head>
+<body>
+    <div id="quiz-wrapper">
+        <div id="summary-container">
+            <div id="summary-text-card" class="summary-card">
+                 <h2 id="summary-title"></h2>
+                 <p class="subtitle" id="summary-subtitle"></p>
+                 <ul id="summary-list"></ul>
+                 <button id="summary-continue-btn">Continuar</button>
+            </div>
+            <div id="summary-visuals-card" class="summary-card">
+                <h3 id="summary-visuals-title"></h3>
+                <div id="static-graphs-container" class="summary-graphs"></div>
+                <div id="interactive-graph-container" class="hidden">
+                    <div id="p5-interactive-canvas" class="p5-canvas-container"></div>
+                    <div id="interactive-graph-equation"></div>
+                    <div class="sliders">
+                        <label>m: <input type="range" id="slope-slider" min="-3" max="3" value="1" step="0.1"></label>
+                        <label>n: <input type="range" id="intercept-slider" min="-3" max="3" value="1" step="0.1"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="quiz-container" class="hidden">
+            <div id="progress-container"><div id="progress-bar"></div></div>
+            <div id="quiz-header-bar">
+                <div id="problem-header"></div>
+                <div id="score-counter"></div>
+                <div id="timer-container">
+                    <svg width="50" height="50" viewBox="0 0 50 50">
+                        <circle id="timer-ring-bg" cx="25" cy="25" r="22"></circle>
+                        <circle id="timer-ring-fg" cx="25" cy="25" r="22"></circle>
+                    </svg>
+                    <div id="timer-text"></div>
+                </div>
+            </div>
+            <div id="question-container"></div>
+            <div id="graph-container"></div>
+            <div id="options-container"></div>
+            <div id="feedback-container"></div>
+            <div id="navigation-container"><button id="next-button">Siguiente →</button></div>
+        </div>
+    </div>
+
+    <script>
+    function renderMath() { if (window.renderMathInElement) { renderMathInElement(document.body, { delimiters: [ {left: "$", right: "$", display: false} ], ignoredClasses: ["no-katex"] }); } }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const icons = {
+            check: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>`,
+            x: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
+        };
+        const staticGraphs = {
+            functionMachine: `<svg viewBox="0 5 200 90" preserveAspectRatio="xMidYMid meet"><defs><filter id="shadow"><feDropShadow dx="2" dy="3" stdDeviation="2" flood-color="#00000033"/></filter></defs><path d="M5 20 L35 20 L50 35 L50 65 L35 80 L5 80 Z" fill="#eef2ff" stroke="#a5b4fc" stroke-width="2"/><text x="25" y="54" font-family="Inter, sans-serif" font-size="14" font-weight="bold" fill="#4f46e5" text-anchor="middle">x</text><path d="M50 50 L80 50" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4"/><rect x="80" y="25" width="40" height="50" rx="5" fill="#4f46e5" stroke="#4338ca" stroke-width="2" filter="url(#shadow)"/><text x="100" y="54" font-family="Inter, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">f(x)</text><path d="M120 50 L150 50" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4"/><path d="M150 20 L180 20 L195 35 L195 65 L180 80 L150 80 Z" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="2"/><text x="172.5" y="54" font-family="Inter, sans-serif" font-size="14" font-weight="bold" fill="#059669" text-anchor="middle">y</text></svg>`,
+            positiveSlope: `<svg viewBox="-5 -5 110 110"><line x1="10" y1="90" x2="90" y2="10" stroke="#4f46e5" stroke-width="2.5"/><line x1="50" y1="0" x2="50" y2="100" stroke="#ccc" stroke-width="1.5"/><line x1="0" y1="50" x2="100" y2="50" stroke="#ccc" stroke-width="1.5"/></svg>`,
+            negativeSlope: `<svg viewBox="-5 -5 110 110"><line x1="10" y1="10" x2="90" y2="90" stroke="#4f46e5" stroke-width="2.5"/><line x1="50" y1="0" x2="50" y2="100" stroke="#ccc" stroke-width="1.5"/><line x1="0" y1="50" x2="100" y2="50" stroke="#ccc" stroke-width="1.5"/></svg>`,
+            zeroSlope: `<svg viewBox="-5 -5 110 110"><line x1="10" y1="40" x2="90" y2="40" stroke="#4f46e5" stroke-width="2.5"/><line x1="50" y1="0" x2="50" y2="100" stroke="#ccc" stroke-width="1.5"/><line x1="0" y1="50" x2="100" y2="50" stroke="#ccc" stroke-width="1.5"/></svg>`,
+            system: `<svg viewBox="-5 -5 110 110"><line x1="20" y1="90" x2="90" y2="20" stroke="#4f46e5" stroke-width="2.5"/><line x1="10" y1="20" x2="80" y2="90" stroke="#10b981" stroke-width="2.5"/><line x1="50" y1="0" x2="50" y2="100" stroke="#ccc" stroke-width="1.5"/><line x1="0" y1="50" x2="100" y2="50" stroke="#ccc" stroke-width="1.5"/></svg>`,
+            parallel: `<svg viewBox="-5 -5 110 110"><line x1="10" y1="70" x2="90" y2="30" stroke="#4f46e5" stroke-width="2.5"/><line x1="10" y1="90" x2="90" y2="50" stroke="#10b981" stroke-width="2.5"/><line x1="50" y1="0" x2="50" y2="100" stroke="#ccc" stroke-width="1.5"/><line x1="0" y1="50" x2="100" y2="50" stroke="#ccc" stroke-width="1.5"/></svg>`,
+        };
+
+        const summaries = {
+            0: { type: 'static', title: "¿Qué es una Función?", subtitle:"Imagina una máquina que transforma cosas.", visualsTitle: "La Máquina de Funciones", graphs: [staticGraphs.functionMachine], points: ["Una función es una <b>regla</b> que asigna a cada elemento de entrada (dominio) exactamente un elemento de salida (recorrido).", "Por ejemplo, 'el doble de un número más 5' se traduce a la función $f(x) = 2x+5$. Si entra un <span class='highlight'>2</span>, la función devuelve $f(2) = 2(2)+5 = 9$.", "Para cada valor de entrada $x$, la 'máquina' $f$ produce un único valor de salida $y$."] },
+            1: { type: 'interactive', title: "La Ecuación de la Recta", subtitle:"Explora cómo la pendiente y el intercepto cambian la gráfica.", visualsTitle: "Visualizador Interactivo", points: ["La forma principal es $y = mx + n$.", "$m$ es la <b>pendiente</b> (inclinación). Si es positiva, sube. Si es negativa, baja.", "$n$ es el <b>coeficiente de posición</b> (el punto donde la recta corta el eje Y)."] },
+            7: { type: 'static', title: "Del Gráfico a la Ecuación", subtitle:"Sigue estos pasos para encontrar la función de una línea.", visualsTitle: "Ejemplos de Pendiente", graphs: [staticGraphs.positiveSlope, staticGraphs.negativeSlope, staticGraphs.zeroSlope], points: ["<b>Paso 1:</b> Identifica dos puntos $(x_1, y_1)$ y $(x_2, y_2)$ en el gráfico.", "<b>Paso 2:</b> Calcula la pendiente: $m = \\frac{y_2 - y_1}{x_2 - x_1}$.", "<b>Paso 3:</b> Usa la forma punto-pendiente: $y - y_1 = m(x - x_1)$."] },
+            12: { type: 'static', title: "Sistemas de Ecuaciones Lineales", subtitle:"Donde dos caminos se cruzan.", visualsTitle: "Tipos de Soluciones", graphs: [staticGraphs.system, staticGraphs.parallel], points: ["La <b>solución</b> de un sistema es el punto $(x, y)$ donde las dos rectas se intersectan.", "Este punto debe <b>satisfacer ambas ecuaciones</b> simultáneamente.", "Líneas <b>paralelas</b> tienen la misma pendiente y <b>nunca</b> se intersectan (sin solución)."] },
+            15: { type: 'text-only', title: "Traduciendo Palabras a Matemáticas", subtitle:"Convierte problemas del mundo real en ecuaciones.", points: ["Un 'valor inicial', 'cargo fijo' o 'costo base' corresponde al coeficiente de posición $n$.", "Una 'tasa', 'precio por unidad' o 'costo por cada...' corresponde a la pendiente $m$.", "El modelo general es: $Costo\\ Total = m \\cdot x + n$."] },
+            23: { type: 'text-only', title: "Propiedades y Conceptos Avanzados", subtitle:"Diferenciando los detalles finos.", points: ["Una <b>función lineal</b> $f(x)=mx$ siempre pasa por el origen (0,0).", "Una <b>función afín</b> $f(x)=mx+n$ es una recta que no necesariamente pasa por el origen.", "La propiedad de proporcionalidad directa es clave en funciones lineales: $f(kx) = k \\cdot f(x)$."] }
+        };
+        
+        const problemsData = [
+            // Start of Section 1: Foundations
+            { "id": "q1", "questionNumber": 37, "question": "Considera la función g definida por $g(x) = 8x-5$, con dominio el conjunto de los números reales.<br>Si $g(x) = 35$, ¿cuál es el valor de $x$?", "options": [ { "label": "A", "value": "$\\frac{15}{4}$" }, { "label": "B", "value": "5" }, { "label": "C", "value": "240" }, { "label": "D", "value": "275" } ], "answer": { "correct_option": "B", "explanation": "Se nos pide encontrar $x$ cuando $g(x) = 35$.<br>1. Igualamos la función a 35: $8x - 5 = 35$.<br>2. Sumamos 5 a ambos lados: $8x = 40$.<br>3. Dividimos por 8: $x = \\frac{40}{8} = 5$." } },
+            { "id": "q2", "questionNumber": 26, "question": "¿Cuál de las siguientes alternativas presenta una <span class='highlight'>función lineal</span>?", "options": [ { "label": "A", "value": "$f(x) = 9$" }, { "label": "B", "value": "$g(x) = -4x$" }, { "label": "C", "value": "$h(x) = 2x + 3$" }, { "label": "D", "value": "$j(x) = x^2 + 5x + 1$" } ], "answer": { "correct_option": "B", "explanation": "Una función lineal es de la forma $f(x) = mx$, donde su gráfica es una recta que pasa por el origen (0,0). La opción B, $g(x) = -4x$, cumple esta condición.<br>La opción C es una función afín ($f(x)=mx+n$), y la D es una función cuadrática." } },
+            { "id": "q3", "questionNumber": 2, "question": "¿Cuál es la <span class='highlight'>pendiente</span> y el <span class='highlight'>coeficiente de posición</span>, respectivamente, de la función: $ky - 2x = 7$?", "options": [ { "label": "A", "value": "$-2 \\text{ y } 7$" }, { "label": "B", "value": "$\\frac{2}{k} \\text{ y } 7$" }, { "label": "C", "value": "$2 \\text{ y } 7$" }, { "label": "D", "value": "$\\frac{2}{k} \\text{ y } \\frac{7}{k}$" } ], "answer": { "correct_option": "D", "explanation": "Para encontrar la pendiente (m) y el coeficiente de posición (n), despejamos 'y' para obtener la forma $y = mx + n$.<br>1. $ky - 2x = 7$<br>2. $ky = 2x + 7$<br>3. $y = \\frac{2}{k}x + \\frac{7}{k}$.<br>Así, la pendiente es $\\frac{2}{k}$ y el coeficiente de posición es $\\frac{7}{k}$." } },
+            { "id": "q4", "questionNumber": 1, "question": "¿Cuál es la <span class='highlight'>pendiente</span> de la función afín: $ay - bx = 1 - \\frac{y}{2}$ ?", "options": [ { "label": "A", "value": "$\\frac{2b}{2a+1}$" }, { "label": "B", "value": "$\\frac{b}{a+1}$" }, { "label": "C", "value": "$\\frac{2}{2a+1}$" }, { "label": "D", "value": "$\\frac{2bx}{2a+1}$" } ], "answer": { "correct_option": "A", "explanation": "Despejamos 'y':<br>1. Agrupar 'y': $ay + \\frac{y}{2} = bx + 1$<br>2. Factorizar: $y(a + \\frac{1}{2}) = bx + 1$<br>3. Simplificar: $y(\\frac{2a+1}{2}) = bx + 1$<br>4. Despejar: $y = \\frac{2b}{2a+1}x + \\frac{2}{2a+1}$.<br>La pendiente es el coeficiente de x, es decir, $\\frac{2b}{2a+1}$." } },
+            { "id": "q5", "questionNumber": 39, "question": "En una imprenta ofrecen un servicio de empastado para tesis, cobrando un valor de <span class='no-katex'>$115</span> por página, más una tarifa fija de <span class='no-katex'>$27.000</span> por el servicio. ¿Cuál de las siguientes funciones modela el precio, en pesos, que debe pagar una persona por empastar su tesis de $x$ páginas?", "options": [ { "label": "A", "value": "$f(x) = 115x$" }, { "label": "B", "value": "$g(x) = 115x + 27000$" }, { "label": "C", "value": "$h(x) = (115 + 27000)x$" }, { "label": "D", "value": "$k(x) = 115 + 27000x$" } ], "answer": { "correct_option": "B", "explanation": "El costo total es la suma de un costo variable y un costo fijo.<br>El costo variable es <span class='no-katex'>$115</span> por página, es decir, $115x$.<br>El costo fijo es <span class='no-katex'>$27.000</span>.<br>La función es $g(x) = 115x + 27000$." } },
+            { "id": "q6", "questionNumber": 22, "question": "Si se tiene la función $f(x) = mx + 2$, con $m \\neq 0$, y se sabe que existe un número real $p$ tal que <span class='highlight'>$f(p) + f(2p) - f(4p) = 22$</span>, entonces el valor de $p$ es:", "options": [ { "label": "A", "value": "$\\frac{20}{m}$" }, { "label": "B", "value": "$20+m$" }, { "label": "C", "value": "$-\\frac{20}{m}$" }, { "label": "D", "value": "$20-m$" } ], "answer": { "correct_option": "C", "explanation": "Evaluamos la función en cada punto:<br> $f(p) = mp+2$<br> $f(2p)=2mp+2$<br> $f(4p)=4mp+2$<br>Sustituimos en la ecuación: $(mp+2) + (2mp+2) - (4mp+2) = 22$.<br>$mp+2mp-4mp+2 = 22 \\implies -mp = 20 \\implies p = -\\frac{20}{m}$." } },
+            // Start of Section 2: Graph Interpretation
+            { "id": "q7", "questionNumber": 4, "question": "La <span class='highlight'>pendiente</span> de la función de la figura es:", "graph": { "type": "linearFunction", "points": [{"x": -2, "y": 0}, {"x": 0, "y": -3}], "xAxis": {"label": "x", "min": -4, "max": 4}, "yAxis": {"label": "y", "min": -4, "max": 4}, "annotations": [{"type":"label", "at":{"x":-2, "y":0}, "text":"-2"}, {"type":"label", "at":{"x":0,"y":-3}, "text":"-3"}] }, "options": [ { "label": "A", "value": "$-\\frac{3}{2}$" }, { "label": "B", "value": "$\\frac{2}{3}$" }, { "label": "C", "value": "$-\\frac{2}{3}$" }, { "label": "D", "value": "$\\frac{3}{2}$" } ], "answer": { "correct_option": "A", "explanation": "La pendiente $m$ se calcula con los puntos de intersección $(-2, 0)$ y $(0, -3)$:<br>$m = \\frac{y_2 - y_1}{x_2 - x_1} = \\frac{-3 - 0}{0 - (-2)} = \\frac{-3}{2}$." } },
+            { "id": "q8", "questionNumber": 3, "question": "La función que representa la gráfica de la siguiente figura es:", "graph": { "type": "linearFunction", "points": [ { "x": 0, "y": 5 }, { "x": 3, "y": 1 } ], "xAxis": { "label": "x", "min": -1, "max": 6 }, "yAxis": { "label": "y", "min": -1, "max": 6 }, "annotations": [ {"type":"dashedLine", "from":{"x":0,"y":1}, "to":{"x":3,"y":1}}, {"type":"dashedLine", "from":{"x":3,"y":0}, "to":{"x":3,"y":1}}, { "type": "label", "at": { "x": 0, "y": 5 }, "text": "5" }, { "type": "label", "at": { "x": 3, "y": 0 }, "text": "3" }, { "type": "label", "at": { "x": 0, "y": 1 }, "text": "1" } ] }, "options": [ { "label": "A", "value": "$y - 5 = -\\frac{4}{3}x$" }, { "label": "B", "value": "$y + 5 = \\frac{3}{4}x$" }, { "label": "C", "value": "$y - 3 = -\\frac{4}{3}(x - 1)$" }, { "label": "D", "value": "$y - 5 = -\\frac{3}{4}x$" } ], "answer": { "correct_option": "A", "explanation": "Calculamos la pendiente con los puntos $(0, 5)$ y $(3, 1)$: $m = \\frac{1 - 5}{3 - 0} = -\\frac{4}{3}$.<br>Usando la forma punto-pendiente $y - y_1 = m(x - x_1)$ con el punto $(0, 5)$: $y - 5 = -\\frac{4}{3}(x - 0)$, que es $y - 5 = -\\frac{4}{3}x$." } },
+            { "id": "q9", "questionNumber": 40, "question": "La distancia de reacción $f$ y la rapidez del vehículo $x$ se relacionan mediante una función de la forma $f(x)=ax$, con $a$ constante. En la siguiente tabla se presentan algunos ejemplos:<br><br><table><tr><th>Rapidez del vehículo</th><th>Distancia de reacción</th></tr><tr><td>$110 \\frac{km}{h}$</td><td>33 m</td></tr><tr><td>$70 \\frac{km}{h}$</td><td>21 m</td></tr></table><br>¿Cuál es la distancia de reacción de un vehículo que tiene una rapidez de $30 \\frac{km}{h}$?", "options": [ { "label": "A", "value": "15 m" }, { "label": "B", "value": "10 m" }, { "label": "C", "value": "9 m" }, { "label": "D", "value": "1 m" } ], "answer": { "correct_option": "C", "explanation": "Primero encontramos la constante $a$ usando uno de los ejemplos: $f(x) = ax \\implies 33 = a \\cdot 110 \\implies a = \\frac{33}{110} = 0,3$.<br>Ahora usamos esta constante para la nueva rapidez: $f(30) = 0,3 \\times 30 = 9$.<br>La distancia de reacción es 9 metros." } },
+            { "id": "q10", "questionNumber": 38, "question": "Para pintar las líneas blancas de una carretera se utilizaron máquinas idénticas que pintan una misma cantidad de kilómetros cada hora. El trabajo se realizó en <span class='highlight'>6 horas</span>; las primeras <span class='highlight'>4 horas</span> trabajó solo <span class='highlight'>una máquina</span>, pero durante las <span class='highlight'>2 horas</span> siguientes trabajaron <span class='highlight'>dos máquinas</span> en forma simultánea. ¿Cuál de los siguientes gráficos representa mejor la relación entre el tiempo y los kilómetros pintados?", "graph": { "type": "multi-graph-in-options", "graphs": [ {"label":"A", "points":[{"x":0,"y":0},{"x":2,"y":2},{"x":6,"y":8}] }, {"label":"B", "points":[{"x":0,"y":0},{"x":4,"y":4},{"x":6,"y":8}] }, {"label":"C", "points":[{"x":0,"y":0},{"x":4,"y":4},{"x":6,"y":5}] }, {"label":"D", "points":[{"x":0,"y":0},{"x":2,"y":2},{"x":6,"y":4}] } ] }, "options": [ { "label": "A" }, { "label": "B" }, { "label": "C" }, { "label": "D" } ], "answer": { "correct_option": "B", "explanation": "El enunciado dice que el cambio de velocidad ocurre a las 4 horas, por lo que el 'quiebre' en el gráfico debe estar en x=4. Esto elimina las opciones A y D.<br>Luego, dice que la velocidad se duplica. En el gráfico B, la pendiente inicial (primeras 4 horas) es $m_1 = \\frac{4-0}{4-0} = 1$. La pendiente final (últimas 2 horas) es $m_2 = \\frac{8-4}{6-4} = \\frac{4}{2} = 2$. Como $m_2 = 2 \\cdot m_1$, este gráfico es el correcto." } },
+            { "id": "q11", "questionNumber": 5, "question": "¿Cuál de los siguientes <span class='highlight'>sistemas de ecuaciones</span>, podría representar el siguiente esquema gráfico?", "graph": { "type": "system", "lines": [ {"label": "L1", "color": "#4f46e5", "points": [{"x": 0, "y": 8}, {"x": 2, "y": 2}]}, {"label": "L2", "color": "#10b981", "points": [{"x": 0, "y": -2}, {"x": 2, "y": 2}]} ], "xAxis": {"label":"x", "min": -1, "max": 5}, "yAxis": {"label":"y", "min": -3, "max": 9}, "annotations": [{"type": "label", "at": {"x": 2, "y": 2}, "text": "(2, 2)"}, {"type":"label", "at":{"x":0,"y":8},"text":"8"},{"type":"label", "at":{"x":0,"y":-2},"text":"-2"}] }, "options": [ { "label": "A", "value": "$\\begin{cases} y = -2x + 2 \\\\ y = 3x - 8 \\end{cases}$" }, { "label": "B", "value": "$\\begin{cases} y = -3x + 5 \\\\ y = 2x - 1 \\end{cases}$" }, { "label": "C", "value": "$\\begin{cases} y = 2x - 2 \\\\ y = -3x + 8 \\end{cases}$" }, { "label": "D", "value": "$\\begin{cases} y = -3x + 8 \\\\ y = 2x \\end{cases}$" } ], "answer": { "correct_option": "C", "explanation": "Las dos rectas se intersectan en (2, 2). Debemos probar cuál sistema satisface este punto.<br><b>Para la opción C:</b><br>Recta 1: $y = 2(2) - 2 = 4-2=2$. Correcto.<br>Recta 2: $y = -3(2) + 8 = -6+8=2$. Correcto.<br>Ambas ecuaciones son verdaderas para (2, 2)." } },
+            { "id": "q12", "questionNumber": 6, "question": "¿Cuál de los siguientes sistemas podría reflejar la gráfica de las funciones A y B?", "graph": {"type":"system", "lines":[{"label":"A","points":[{"x":-5,"y":0},{"x":0,"y":5}]},{"label":"B","points":[{"x":-10,"y":0},{"x":0,"y":10}]} ], "xAxis":{"label":"x","min":-11,"max":5}, "yAxis":{"label":"y","min":-1,"max":11}, "annotations":[{"type":"label","at":{"x":0,"y":10},"text":"10"}, {"type":"label","at":{"x":-10,"y":0},"text":"B"}, {"type":"label","at":{"x":0,"y":5},"text":"5"},{"type":"label","at":{"x":-5,"y":0},"text":"A"}] }, "options": [{"label":"A","value":"$\\begin{cases} y = x+5 \\\\ y=x+10 \\end{cases}$"},{"label":"B","value":"$\\begin{cases} y = x \\\\ y=x+7 \\end{cases}$"},{"label":"C","value":"$\\begin{cases} y = x+5 \\\\ y=-x+5 \\end{cases}$"},{"label":"D","value":"$\\begin{cases} y = x+7 \\\\ y=x-4 \\end{cases}$"}], "answer": {"correct_option":"A", "explanation":"Ambas líneas tienen la misma pendiente (son paralelas).<br>Pendiente de A: $m=\\frac{5-0}{0-(-5)}=1$.<br>Pendiente de B: $m=\\frac{10-0}{0-(-10)}=1$.<br>La ecuación de A (intercepto y=5) es $y=x+5$. La ecuación de B (intercepto y=10) es $y=x+10$."}},
+            { "id": "q13", "questionNumber": 10, "question": "¿Cuáles son las coordenadas del <span class='highlight'>punto de intersección</span> entre las funciones L1 y L2, que se muestran en el siguiente gráfico y qué representan?", "graph": { "type": "system", "lines": [ {"label": "L1", "points": [{"x":0, "y":15}, {"x":10, "y":0}]}, {"label": "L2: y=x", "points": [{"x":0,"y":0}, {"x":15,"y":15}]} ], "xAxis": {"min": -2, "max": 17}, "yAxis": {"min": -2, "max": 17}, "annotations": [{"type":"label", "at":{"x":0,"y":15}, "text":"15"}, {"type":"label", "at":{"x":10,"y":0}, "text":"10"}, {"type":"label", "at":{"x":6,"y":6},"text":"(6,6)"}] }, "options": [ { "label": "A", "value": "(5; 7,5) y corresponde al punto en que ambas funciones toman el mismo valor." }, { "label": "B", "value": "(6, 8) y corresponde a la solución del sistema de ecuaciones entre L1 y L2." }, { "label": "C", "value": "(6, 6) y corresponde al punto de indiferencia entre ambas funciones." }, { "label": "D", "value": "(6, 6) y corresponde a las coordenadas donde ambas funciones igualan sus pendientes." } ], "answer": { "correct_option": "C", "explanation": "La ecuación de L1 es $y = -1.5x + 15$. La ecuación de L2 es $y=x$.<br>Igualamos: $x = -1.5x + 15 \\implies 2.5x = 15 \\implies x = 6$.<br>Como $y=x$, el punto es (6, 6). Este es el punto de indiferencia o equilibrio." } },
+            // Start of Section 4: Modeling
+            { "id": "q14", "questionNumber": 19, "question": "El nivel de agua en un estanque es de <span class='highlight'>12 metros</span> y baja <span class='highlight'>0,5 metros</span> cada semana. ¿Cuál de las siguientes funciones representa la situación descrita relacionando el nivel de agua $N(x)$ y con el número de semana $x$?", "options": [ { "label": "A", "value": "$N(x) = 12 - 3,5x$" }, { "label": "B", "value": "$N(x) = 0,5x - 12$" }, { "label": "C", "value": "$N(x) = 0,5x - 7$" }, { "label": "D", "value": "$N(x) = 12 - 0,5x$" } ], "answer": { "correct_option": "D", "explanation": "El nivel inicial es 12 metros. Por cada semana $x$, el nivel 'baja' 0.5 metros (pendiente de -0.5). La función es $N(x) = 12 - 0,5x$." } },
+            { "id": "q15", "questionNumber": 37, "question": "Un plan de internet móvil cuesta <span class='no-katex'>$10.000</span> de cargo fijo e incluye <span class='highlight'>10 GB</span>. Por cada <span class='highlight'>1 GB</span> adicional ($x$) que se navegue, se cobrarán <span class='no-katex'>$2.500</span>. La función que representa el costo en pesos en función de la cantidad de GB adicionales es:", "options": [ { "label": "A", "value": "$f(x) = 10000x + 2500x$" }, { "label": "B", "value": "$f(x) = 10000 + 2500x$" }, { "label": "C", "value": "$f(x) = 10000x^2 + 2500x$" }, { "label": "D", "value": "$f(x) = 10000x + 2500$" } ], "answer": { "correct_option": "B", "explanation": "El costo tiene un valor base o fijo de <span class='no-katex'>$10.000</span>.<br>A este valor se le suma un costo variable que depende de los GB adicionales $x$. El costo variable es <span class='no-katex'>$2.500</span> por cada GB adicional, es decir, $2500x$.<br>El costo total es la suma del fijo más el variable: $f(x) = 10000 + 2500x$." } },
+            { "id": "q16", "questionNumber": 11, "question": "Un emprendedor ha modelado el precio de venta de sus productos como: $p(x) = 1,3x$, donde $x$ representa el precio de costo y $p$ el precio de venta. ¿Cuál de las siguientes afirmaciones se puede deducir?", "options": [ { "label": "A", "value": "Por cada <span class='no-katex'>$100</span> de incremento en el costo, el precio de venta se incrementa en 13 pesos." }, { "label": "B", "value": "El precio de venta tiene un recargo del 30% sobre el precio de costo." }, { "label": "C", "value": "El emprendedor estableció una función afín para determinar el precio de venta." }, { "label": "D", "value": "$p - 1,3x$, representa la ganancia." } ], "answer": { "correct_option": "B", "explanation": "La ecuación $p(x) = 1,3x$ se puede reescribir como $p(x) = 1x + 0,3x$.<br>Esto significa que el precio de venta es el 100% del costo ($1x$) más un 30% adicional del costo ($0,3x$).<br>Por lo tanto, el precio de venta tiene un recargo del 30%." } },
+            { "id": "q17", "questionNumber": 18, "question": "La biblioteca de una universidad presta libros como máximo por <span class='highlight'>una semana</span>. Luego, se debe cancelar <span class='no-katex'>$500</span> de multa por cada <span class='highlight'>día de retraso</span>. Si $E(x)$ es el valor que debe pagar un estudiante que tuvo un libro durante $x$ días, con $x > 7$, ¿cuál expresión es igual a $E(x)$?", "options": [ { "label": "A", "value": "$E(x) = 7x - 3500$" }, { "label": "B", "value": "$E(x) = 3500x - 500$" }, { "label": "C", "value": "$E(x) = 500x - 3500$" }, { "label": "D", "value": "$E(x) = 500x$" } ], "answer": { "correct_option": "C", "explanation": "Los días de retraso son el total de días ($x$) menos la semana gratuita (7 días), es decir, $(x-7)$ días de retraso.<br>La multa es <span class='no-katex'>$500</span> por cada día de retraso.<br>Por lo tanto, la multa total es $E(x) = 500 \\times (x-7) = 500x - 3500$." } },
+            { "id": "q18", "questionNumber": 12, "question": "Una empresa modela el costo total para producir $x$ kilos de miel mediante $M(x) = 1500x + 700$. Si el costo total se incrementa en un <span class='highlight'>22%</span>, ¿cuál es la nueva función de costo?", "options": [ { "label": "A", "value": "$F(x) = 1830x + 854$" }, { "label": "B", "value": "$T(x) = 1830x + 700$" }, { "label": "C", "value": "$P(x) = 1500x + 854$" }, { "label": "D", "value": "$K(x) = 330x + 154$" } ], "answer": { "correct_option": "A", "explanation": "Incrementar el costo total en un 22% significa multiplicar toda la función por 1,22. <br>Nueva Función = $1,22 \\times M(x) = 1,22 \\times (1500x + 700)$.<br>Distribuimos: $(1,22 \\times 1500x) + (1,22 \\times 700) = 1830x + 854$." } },
+            { "id": "q19", "questionNumber": 13, "question": "Presupuestos para ir a la playa (donde $x$ es el número de integrantes): <ul><li>Playa Brava: <span class='no-katex'>$7.000</span>$x + <span class='no-katex'>$4.000</span></li><li>Playa Mansa: <span class='no-katex'>$5.000</span>$x + <span class='no-katex'>$10.000</span></li></ul> ¿Cuántos integrantes deben ir como mínimo para que salga más económico ir a playa Mansa, que a playa Brava?", "options": [ { "label": "A", "value": "3" }, { "label": "B", "value": "4" }, { "label": "C", "value": "5" }, { "label": "D", "value": "2" } ], "answer": { "correct_option": "B", "explanation": "Queremos que el costo de Mansa sea menor que el de Brava: $5000x + 10000 < 7000x + 4000$.<br>Restamos $5000x$ de ambos lados: $10000 < 2000x + 4000$.<br>Restamos 4000: $6000 < 2000x$.<br>Dividimos por 2000: $3 < x$.<br>El número de integrantes $x$ debe ser mayor que 3. El mínimo número entero es 4." } },
+            { "id": "q20", "questionNumber": 41, "question": "En el año <span class='highlight'>2021</span> se produjeron <span class='highlight'>57,4 millones</span> de toneladas de basura tecnológica y en el año <span class='highlight'>2022</span> se produjeron <span class='highlight'>59,4 millones</span>. Si se considera que el aumento de producción de basura será el mismo cada año, ¿cuántos millones de toneladas de basura se producirían en el año <span class='highlight'>2030</span>?", "options": [ { "label": "A", "value": "77,4" }, { "label": "B", "value": "75,4" }, { "label": "C", "value": "73,4" }, { "label": "D", "value": "71,4" } ], "answer": { "correct_option": "B", "explanation": "El aumento anual (la pendiente) es $59,4 - 57,4 = 2$ millones de toneladas por año.<br>El número de años desde 2022 hasta 2030 es $2030 - 2022 = 8$ años.<br>El aumento total en esos 8 años será $8 \\times 2 = 16$ millones de toneladas.<br>La producción total en 2030 será la de 2022 más el aumento: $59,4 + 16 = 75,4$ millones." } },
+            { "id": "q21", "questionNumber": 35, "question": "Carol tiene 2 ofertas laborares:<ul><li>Oferta 1: Sueldo fijo de US<span class='no-katex'>$580</span> + US<span class='no-katex'>$25</span> por artículo vendido.</li><li>Oferta 2: Sueldo de US<span class='no-katex'>$450</span> + US<span class='no-katex'>$32</span> por artículo vendido.</li></ul>¿Cuál afirmación es correcta de inferir al respecto?", "options": [ { "label": "A", "value": "Si vende 18 unidades, ambas propuestas le generarían el mismo ingreso." }, { "label": "B", "value": "Si vende 19 unidades o más, recibe más ingresos con la primera propuesta." }, { "label": "C", "value": "Si vende 18 unidades, la primera oferta le genera más ingresos." }, { "label": "D", "value": "Si vende menos de 20 unidades, siempre será más conveniente la primera oferta." } ], "answer": { "correct_option": "C", "explanation": "Evaluemos ambas ofertas para 18 unidades ($x=18$).<br>Oferta 1: $580 + 25(18) = 580 + 450 = 1030$.<br>Oferta 2: $450 + 32(18) = 450 + 576 = 1026$.<br>Con 18 unidades, la primera oferta genera US<span class='no-katex'>$1030</span>, que es más que los US<span class='no-katex'>$1026</span> de la segunda. Por lo tanto, la afirmación C es correcta." } },
+            // Start of Section 5: Concepts
+            { "id": "q22", "questionNumber": 14, "question": "La intersección de oferta y demanda es el <span class='highlight'>punto de equilibrio</span>. Si la empresa puede producir la cantidad demandada, al precio de equilibrio, ¿cuáles serían sus ingresos por la venta de este producto?", "graph": { "type": "system", "lines": [{"label":"Demanda","color":"#4f46e5","points":[{"x":0,"y":6},{"x":5,"y":0}]},{"label":"Oferta","color":"#10b981","points":[{"x":0,"y":0},{"x":10.6,"y":5.6}]}], "xAxis":{"label":"Decenas de miles de productos","min":-1,"max":12}, "yAxis":{"label":"Precio en miles de pesos","min":-1,"max":7}, "annotations":[{"type":"label","at":{"x":3.5,"y":1.8},"text":"E(3.5, 1.8)"}, {"type":"label","at":{"x":0,"y":6},"text":"6"}, {"type":"label", "at":{"x":5,"y":0},"text":"5"}, {"type":"label", "at":{"x":10.6,"y":5.6},"text":"(10.6, 5.6)"}] }, "options": [ { "label": "A", "value": "<span class='no-katex'>$63.000.000</span>" }, { "label": "B", "value": "<span class='no-katex'>$6.300.000</span>" }, { "label": "C", "value": "<span class='no-katex'>$90.000.000</span>" }, { "label": "D", "value": "<span class='no-katex'>$300.000.000</span>" } ], "answer": { "correct_option": "A", "explanation": "El punto de equilibrio es E(3.5, 1.8).<br>La cantidad (eje X) es 3.5 decenas de miles, o $3.5 \\times 10.000 = 35.000$ productos.<br>El precio (eje Y) es 1.8 miles de pesos, o <span class='no-katex'>$1.800</span> por producto.<br>Ingreso Total = Cantidad $\\times$ Precio = $35.000 \\times 1.800 = 63.000.000$." } },
+            { "id": "q23", "questionNumber": 40, "question": "¿Cuál gráfica podría corresponder a una <span class='highlight'>función lineal</span> de <span class='highlight'>pendiente negativa</span>?", "graph": {"type":"multi-graph-in-options", "graphs": [ {"label":"A", "points":[{"x":-1,"y":-1},{"x":1,"y":1}]}, {"label":"B", "points":[{"x":-1, "y":1.5}, {"x":1.5, "y":-1}]}, {"label":"C", "points":[{"x":-1,"y":1},{"x":1,"y":-1}]}, {"label":"D", "points":[{"x":-1,"y":-1},{"x":1,"y":1}]} ]}, "options": [ { "label": "A" }, { "label": "B" }, { "label": "C" }, { "label": "D" } ], "answer": { "correct_option": "C", "explanation": "Una pendiente negativa significa que a medida que $x$ aumenta (se mueve a la derecha), $y$ disminuye (se mueve hacia abajo). Las gráficas B y C muestran esta característica.<br>Una función lineal debe pasar por el origen (0,0).<br>La gráfica C es la única que es una línea descendente y pasa por el origen." } },
+            { "id": "q24", "questionNumber": 29, "question": "Si $f$ es una <span class='highlight'>función lineal</span> y se tienen dos números reales $x$ e $y$, ¿cuál de las siguientes afirmaciones es siempre falsa?", "options": [ { "label": "A", "value": "$f(0) = 0$" }, { "label": "B", "value": "$f(x + y) = f(x) + f(y)$" }, { "label": "C", "value": "$3f(x) = f(3x)$" }, { "label": "D", "value": "$f(xy) = f(x) \\cdot f(y)$" } ], "answer": { "correct_option": "D", "explanation": "Una función lineal tiene la forma $f(x)=mx$.<br>A) $f(0) = m(0) = 0$. (Verdadero)<br>B) $f(x+y) = m(x+y) = mx+my = f(x)+f(y)$. (Verdadero)<br>C) $3f(x) = 3(mx) = m(3x) = f(3x)$. (Verdadero)<br>D) $f(xy)=m(xy)$, mientras que $f(x)f(y) = (mx)(my) = m^2xy$. Estas expresiones solo son iguales si $m=1$ o $m=0$. No es siempre verdadero, por lo tanto puede ser falso." } }
+        ];
+
+        // All JavaScript logic remains the same as the previous correct version...
+        let currentProblemIndex = 0;
+        let score = 0;
+        let p5Instances = [];
+        let timerInterval;
+        const TIME_PER_QUESTION = 120;
+        let interactiveP5 = null;
+
+        const summaryContainerEl = document.getElementById('summary-container');
+        const summaryTextCardEl = document.getElementById('summary-text-card');
+        const summaryVisualsCardEl = document.getElementById('summary-visuals-card');
+        const summaryTitleEl = document.getElementById('summary-title');
+        const summarySubtitleEl = document.getElementById('summary-subtitle');
+        const summaryListEl = document.getElementById('summary-list');
+        const staticGraphsEl = document.getElementById('static-graphs-container');
+        const interactiveGraphEl = document.getElementById('interactive-graph-container');
+        const summaryContinueBtn = document.getElementById('summary-continue-btn');
+        const quizContainerEl = document.getElementById('quiz-container');
+        const summaryVisualsTitleEl = document.getElementById('summary-visuals-title');
+        
+        const headerEl = document.getElementById('problem-header');
+        const questionEl = document.getElementById('question-container');
+        const graphEl = document.getElementById('graph-container');
+        const optionsEl = document.getElementById('options-container');
+        const feedbackEl = document.getElementById('feedback-container');
+        const nextButton = document.getElementById('next-button');
+        const progressBar = document.getElementById('progress-bar');
+        const timerTextEl = document.getElementById('timer-text');
+        const timerRingFgEl = document.getElementById('timer-ring-fg');
+        const scoreCounterEl = document.getElementById('score-counter');
+        const ringRadius = timerRingFgEl.r.baseVal.value;
+        const ringCircumference = 2 * Math.PI * ringRadius;
+        timerRingFgEl.style.strokeDasharray = `${ringCircumference} ${ringCircumference}`;
+        
+        function showSummary(index) {
+            clearInterval(timerInterval);
+            const summary = summaries[index];
+            summaryTitleEl.textContent = summary.title;
+            summarySubtitleEl.textContent = summary.subtitle;
+            summaryListEl.innerHTML = '';
+            summary.points.forEach(point => {
+                const li = document.createElement('li');
+                li.innerHTML = point;
+                summaryListEl.appendChild(li);
+            });
+            
+            summaryContainerEl.className = summary.type === 'interactive' ? 'interactive-view' : (summary.type === 'text-only' ? 'text-only-view' : '');
+            if(interactiveP5) { interactiveP5.remove(); interactiveP5 = null; }
+            staticGraphsEl.innerHTML = '';
+            
+            if(summary.type === 'text-only'){
+                summaryVisualsCardEl.classList.add('hidden');
+            } else {
+                summaryVisualsCardEl.classList.remove('hidden');
+                summaryVisualsTitleEl.textContent = summary.visualsTitle;
+                if(summary.type === 'interactive') {
+                    interactiveGraphEl.classList.remove('hidden');
+                    staticGraphsEl.classList.add('hidden');
+                    setTimeout(() => {
+                        interactiveP5 = new p5(createInteractiveSketch(), 'p5-interactive-canvas');
+                    }, 0);
+                } else {
+                    interactiveGraphEl.classList.add('hidden');
+                    staticGraphsEl.classList.remove('hidden');
+                    if(summary.graphs) {
+                        summary.graphs.forEach(graphSVG => {
+                            const div = document.createElement('div');
+                            div.innerHTML = graphSVG;
+                            staticGraphsEl.appendChild(div);
+                        });
+                    }
+                }
+            }
+            renderMath();
+            quizContainerEl.style.display = 'none';
+            summaryContainerEl.style.display = 'flex';
+        }
+
+        summaryContinueBtn.onclick = () => {
+            summaryContainerEl.style.display = 'none';
+            quizContainerEl.style.display = 'block';
+            renderProblem(currentProblemIndex);
+        };
+
+        function startQuiz() {
+            if (summaries[currentProblemIndex]) { showSummary(currentProblemIndex); } 
+            else { renderProblem(currentProblemIndex); }
+        }
+
+        function renderProblem(index) {
+            clearInterval(timerInterval);
+            optionsEl.innerHTML = '';
+            feedbackEl.style.display = 'none';
+            nextButton.classList.remove('visible');
+            p5Instances.forEach(p => p.remove());
+            p5Instances = [];
+            graphEl.innerHTML = '';
+            graphEl.className = '';
+            optionsEl.className = '';
+
+            const problem = problemsData[index];
+            headerEl.textContent = `Pregunta ${index + 1} de ${problemsData.length}`;
+            questionEl.innerHTML = `(${problem.questionNumber}) ${problem.question}`;
+            progressBar.style.width = `${((index) / problemsData.length) * 100}%`;
+            scoreCounterEl.textContent = `✅ Score: ${score}`;
+            
+            if (problem.graph) {
+                if (problem.graph.type === 'multi-graph-in-options') {
+                    graphEl.style.display = 'none';
+                    optionsEl.className = 'options-grid-with-graphs';
+                    problem.graph.graphs.forEach(g => {
+                        const optionBlock = document.createElement('div');
+                        optionBlock.className = 'option-block-graph';
+                        optionBlock.dataset.label = g.label;
+                        optionBlock.onclick = handleOptionClick;
+                        const label = document.createElement('div');
+                        label.className = 'label';
+                        label.textContent = `${g.label})`;
+                        const canvasContainer = document.createElement('div');
+                        canvasContainer.className = 'option-graph-canvas-container';
+                        optionBlock.appendChild(label);
+                        optionBlock.appendChild(canvasContainer);
+                        optionsEl.appendChild(optionBlock);
+                        const graphData = { type: 'linearFunction', points: g.points, xAxis: {min: 0, max: 7}, yAxis: {min: 0, max: 9} };
+                        p5Instances.push(new p5(createGraphSketch(graphData, true), canvasContainer));
+                    });
+                } else {
+                    graphEl.style.display = 'block';
+                    p5Instances.push(new p5(createGraphSketch(problem.graph, false), graphEl));
+                    problem.options.forEach(createOptionButton);
+                }
+            } else {
+                 graphEl.style.display = 'none';
+                 problem.options.forEach(createOptionButton);
+            }
+            renderMath();
+            startTimer(TIME_PER_QUESTION);
+        }
+
+        function createOptionButton(option) {
+            const button = document.createElement('button');
+            button.className = 'option-button';
+            button.dataset.label = option.label;
+            button.innerHTML = `<span class="label">${option.label})</span> <span class="value">${option.value || ''}</span>`;
+            button.onclick = handleOptionClick;
+            optionsEl.appendChild(button);
+        }
+        
+        function handleOptionClick(event, timedOut = false) {
+            clearInterval(timerInterval);
+            const problem = problemsData[currentProblemIndex];
+            const correctLabel = problem.answer.correct_option;
+            const correctButton = document.querySelector(`[data-label="${correctLabel}"]`);
+            if (correctButton) correctButton.classList.add('correct');
+            
+            let isAnswerCorrect = false;
+            if(!timedOut){
+                const selectedButton = event.currentTarget;
+                const selectedLabel = selectedButton.dataset.label;
+                if (selectedLabel === correctLabel) {
+                    score++;
+                    isAnswerCorrect = true;
+                } else {
+                    selectedButton.classList.add('incorrect');
+                }
+            }
+            
+            scoreCounterEl.textContent = `✅ Score: ${score}`;
+            document.querySelectorAll('.option-button, .option-block-graph').forEach(btn => { btn.classList.add('disabled'); btn.onclick = null; });
+            progressBar.style.width = `${((currentProblemIndex + 1) / problemsData.length) * 100}%`;
+            
+            feedbackEl.className = isAnswerCorrect ? 'feedback-container correct' : 'feedback-container incorrect';
+            const feedbackTitle = isAnswerCorrect ? `<div id="feedback-title">${icons.check} Correcto</div>` : `<div id="feedback-title">${icons.x} Incorrecto</div>`;
+            feedbackEl.innerHTML = `${feedbackTitle}${problem.answer.explanation}`;
+            
+            renderMath();
+            feedbackEl.style.display = 'block';
+            if (currentProblemIndex < problemsData.length - 1) { nextButton.textContent = 'Siguiente →'; } 
+            else { nextButton.textContent = 'Ver Resultados'; }
+            nextButton.classList.add('visible');
+        }
+        
+        function startTimer(duration) {
+            let timeLeft = duration;
+            const updateTimer = () => {
+                const minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                seconds = seconds < 10 ? '0' + seconds : seconds;
+                timerTextEl.textContent = `${minutes}:${seconds}`;
+                const progress = timeLeft / duration;
+                timerRingFgEl.style.strokeDashoffset = ringCircumference * (1 - progress);
+                timerRingFgEl.classList.remove('warning', 'ending');
+                if (timeLeft <= 5) { timerRingFgEl.classList.add('ending'); } 
+                else if (timeLeft <= 15) { timerRingFgEl.classList.add('warning'); }
+                if (--timeLeft < 0) {
+                    clearInterval(timerInterval);
+                    handleOptionClick(null, true);
+                }
+            }
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        nextButton.onclick = () => {
+            currentProblemIndex++;
+            if (summaries[currentProblemIndex]) {
+                showSummary(currentProblemIndex);
+            } else if (currentProblemIndex < problemsData.length) {
+                renderProblem(currentProblemIndex);
+            } else {
+                showFinalResults();
+            }
+        };
+
+        function showFinalResults() {
+             const percentage = Math.round((score / problemsData.length) * 100);
+             document.getElementById('quiz-wrapper').innerHTML = `<div id="quiz-container"><div id="final-screen">
+                    <h2>Quiz Completado</h2><p>Tu puntaje final es:</p>
+                    <p style="font-size: 2.5em; font-weight: bold; margin: 0.5em 0;">${score} / ${problemsData.length}</p>
+                    <p style="font-size: 1.5em; color: ${percentage > 50 ? 'var(--success-color)' : 'var(--danger-color)'};">(${percentage}%)</p>
+                    <button id="repeat-btn">Repetir Quiz</button>
+                </div></div>`;
+             document.getElementById('repeat-btn').onclick = () => window.location.reload();
+        }
+        
+        function createGraphSketch(graphData, isMultiGraphOption = false) {
+            return function(p) {
+                p.setup = function() {
+                    let container = p.canvas.parentElement;
+                    p.createCanvas(container.offsetWidth, container.offsetHeight);
+                    p.noLoop();
+                };
+                p.draw = function() {
+                    p.background(255);
+                    const pad = { top: 20, right: 20, bottom: 20, left: 20 };
+                    const mapX = val => p.map(val, graphData.xAxis.min, graphData.xAxis.max, pad.left, p.width - pad.right);
+                    const mapY = val => p.map(val, graphData.yAxis.min, graphData.yAxis.max, p.height - pad.bottom, pad.top);
+                    
+                    p.stroke(200); p.strokeWeight(1.5);
+                    p.line(mapX(0), pad.top, mapX(0), p.height - pad.bottom);
+                    p.line(pad.left, mapY(0), p.width - pad.right, mapY(0));
+                    
+                    if(isMultiGraphOption){
+                        p.stroke(230); p.strokeWeight(1);
+                        for(let i = 1; i <= graphData.xAxis.max-1; i++) { p.line(mapX(i), pad.top, mapX(i), p.height - pad.bottom); }
+                        for(let i = 1; i <= graphData.yAxis.max-1; i++) { p.line(pad.left, mapY(i), p.width - pad.right, mapY(i)); }
+                        p.stroke(120); p.strokeWeight(1.5);
+                        p.line(mapX(0), pad.top, mapX(0), p.height-pad.bottom); p.line(pad.left, mapY(0), p.width-pad.right, mapY(0));
+                        p.noStroke(); p.fill(100); p.textAlign(p.CENTER, p.TOP);
+                        [2,4,6].forEach(tick => p.text(tick, mapX(tick), mapY(0)+5));
+                    }
+
+                    const drawLine = (points, color) => {
+                        p.stroke(color || '#4f46e5'); p.strokeWeight(2.5); p.noFill();
+                        p.beginShape();
+                        points.forEach(point => p.vertex(mapX(point.x), mapY(point.y)));
+                        p.endShape();
+                    };
+
+                    if(graphData.type === 'system'){
+                        graphData.lines.forEach(line => drawLine(line.points, line.color));
+                    } else {
+                        drawLine(graphData.points, '#4f46e5');
+                    }
+
+                    if (graphData.annotations) {
+                        graphData.annotations.forEach(anno => {
+                            p.noStroke(); p.fill(50); p.textAlign(p.CENTER, p.CENTER); p.textSize(12);
+                            if (anno.type === 'dashedLine') {
+                                p.drawingContext.setLineDash([4, 4]); p.stroke(150); p.strokeWeight(1);
+                                p.line(mapX(anno.from.x), mapY(anno.from.y), mapX(anno.to.x), mapY(anno.to.y));
+                                p.drawingContext.setLineDash([]);
+                            } else if (anno.type === 'label') {
+                                let x = mapX(anno.at.x); let y = mapY(anno.at.y);
+                                if(anno.at.x === 0 && anno.at.y !== 0) x -= 15;
+                                if(anno.at.y === 0 && anno.at.x !== 0) y += 15;
+                                if(anno.at.y === 0 && anno.at.x === 0) { x += 15; y += 15;}
+                                p.text(anno.text, x, y);
+                            }
+                        });
+                    }
+                };
+            };
+        }
+        
+        function createInteractiveSketch() {
+            return function(p) {
+                let slopeSlider, interceptSlider, equationEl;
+                p.setup = function() {
+                    let container = p.canvas.parentElement;
+                    p.createCanvas(container.offsetWidth, container.offsetHeight);
+                    slopeSlider = document.getElementById('slope-slider');
+                    interceptSlider = document.getElementById('intercept-slider');
+                    equationEl = document.getElementById('interactive-graph-equation');
+                    slopeSlider.addEventListener('input', () => p.loop());
+                    interceptSlider.addEventListener('input', () => p.loop());
+                    p.loop();
+                };
+                p.draw = function() {
+                    p.background(255);
+                    const m = parseFloat(slopeSlider.value);
+                    const n = parseFloat(interceptSlider.value);
+                    const pad = { top: 10, right: 10, bottom: 10, left: 10 };
+                    const mapX = val => p.map(val, -5, 5, pad.left, p.width - pad.right);
+                    const mapY = val => p.map(val, -5, 5, p.height - pad.bottom, pad.top);
+                    p.stroke(200); p.strokeWeight(1.5);
+                    p.line(mapX(0), 0, mapX(0), p.height);
+                    p.line(0, mapY(0), p.width, mapY(0));
+                    const y1 = m * (-5) + n;
+                    const y2 = m * 5 + n;
+                    p.stroke('#ef4444'); p.strokeWeight(3);
+                    p.line(mapX(-5), mapY(y1), mapX(5), mapY(y2));
+                    equationEl.innerHTML = `$y = ${m.toFixed(1)}x ${n >= 0 ? '+' : '-'} ${Math.abs(n).toFixed(1)}$`;
+                    renderMath();
+                    p.noLoop();
+                };
+                p.windowResized = function() {
+                    let container = p.canvas.parentElement;
+                    p.resizeCanvas(container.offsetWidth, container.offsetHeight);
+                    p.redraw();
+                }
+            };
+        }
+        startQuiz();
+    });
+    </script>
+</body>
+</html>
